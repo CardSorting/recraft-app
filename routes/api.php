@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ImageGenerationController;
 use App\Http\Controllers\Api\Emoji\CategoryController;
 use App\Http\Controllers\Api\Emoji\SuggestionController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('v1')->middleware('auth')->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'web'])->group(function () {
     // Image Generation Routes
     Route::post('images/generate', [ImageGenerationController::class, 'generate'])
         ->name('api.images.generate');
