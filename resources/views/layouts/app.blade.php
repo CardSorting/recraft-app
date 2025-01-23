@@ -29,8 +29,11 @@
 
             <!-- Page Content -->
             <main>
-                @yield('content')
+                {{ $slot }}
             </main>
         </div>
+
+        <!-- Scripts -->
+        @stack('scripts')
     </body>
 </html>
