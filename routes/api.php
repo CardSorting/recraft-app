@@ -17,27 +17,29 @@ use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 |
 */
 
-Route::prefix('v1')->middleware(['auth:sanctum', 'web'])->group(function () {
-    // Image Generation Routes
-    Route::post('images/generate', [ImageGenerationController::class, 'generate'])
-        ->name('api.images.generate');
-    Route::get('images/{requestId}/status', [ImageGenerationController::class, 'status'])
-        ->name('api.images.status');
+Route::middleware(EnsureFrontendRequestsAreStateful::class)->group(function () {
+    Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+        // Image Generation Routes
+        Route::post('images/generate', [ImageGenerationController::class, 'generate'])
+            ->name('api.images.generate');
+        Route::get('images/{requestId}/status', [ImageGenerationController::class, 'status'])
+            ->name('api.images.status');
 
-    // Emoji Routes
-    Route::prefix('emoji')->group(function () {
-        // Category Routes
-        Route::get('categories', [CategoryController::class, 'index'])
-            ->name('api.emoji.categories.index');
-        Route::get('categories/{category}', [CategoryController::class, 'show'])
-            ->name('api.emoji.categories.show');
+        // Emoji Routes
+        Route::prefix('emoji')->group(function () {
+            // Category Routes
+            Route::get('categories', [CategoryController::class, 'index'])
+                ->name('api.emoji.categories.index');
+            Route::get('categories/{category}', [CategoryController::class, 'show'])
+                ->name('api.emoji.categories.show');
 
-        // Suggestion Routes
-        Route::post('suggestions', [SuggestionController::class, 'suggestions'])
-            ->name('api.emoji.suggestions');
-        Route::post('translate', [SuggestionController::class, 'translate'])
-            ->name('api.emoji.translate');
-        Route::post('preview', [SuggestionController::class, 'preview'])
-            ->name('api.emoji.preview');
+            // Suggestion Routes
+            Route::post('suggestions', [SuggestionController::class, 'suggestions'])
+                ->name('api.emoji.suggestions');
+            Route::post('translate', [SuggestionController::class, 'translate'])
+                ->name('api.emoji.translate');
+            Route::post('preview', [SuggestionController::class, 'preview'])
+                ->name('api.emoji.preview');
+        });
     });
 });
