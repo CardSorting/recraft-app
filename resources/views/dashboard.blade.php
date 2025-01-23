@@ -170,20 +170,14 @@
         async function updatePreview() {
             if (selectedEmojis.size > 0) {
                 try {
-                    const response = await fetch('/api/v1/emoji/preview', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify({ emojis: Array.from(selectedEmojis) })
+                    const { data } = await axios.post('/api/v1/emoji/preview', {
+                        emojis: Array.from(selectedEmojis)
                     });
-                    const data = await response.json();
                     
                     previewTranslation.textContent = `Will generate: ${data.final_translation}`;
                     previewTranslation.classList.add('suggestion-enter');
                 } catch (error) {
-                    console.error('Preview error:', error);
+                    console.error('Preview error:', error.response?.data || error.message);
                 }
             } else {
                 previewTranslation.textContent = '';
@@ -232,15 +226,7 @@
 
         async function showSuggestions(emoji) {
             try {
-                const response = await fetch('/api/v1/emoji/suggestions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ emoji })
-                });
-                const data = await response.json();
+                const { data } = await axios.post('/api/v1/emoji/suggestions', { emoji });
                 
                 if (data.suggestions && data.suggestions.length > 0) {
                     emojiSuggestions.innerHTML = '';
@@ -258,7 +244,7 @@
                     });
                 }
             } catch (error) {
-                console.error('Suggestions error:', error);
+                console.error('Suggestions error:', error.response?.data || error.message);
             }
         }
 
@@ -288,8 +274,7 @@
         // Initialize categorized emojis
         async function loadCategories() {
             try {
-                const response = await fetch('/api/v1/emoji/categories');
-                const data = await response.json();
+                const { data } = await axios.get('/api/v1/emoji/categories');
                 
                 const categoryTabs = document.getElementById('emojiCategories');
                 Object.entries(data.categories).forEach(([name, info]) => {
@@ -299,7 +284,7 @@
                     categoryTabs.appendChild(tab);
                 });
             } catch (error) {
-                console.error('Categories error:', error);
+                console.error('Categories error:', error.response?.data || error.message);
             }
         }
 
