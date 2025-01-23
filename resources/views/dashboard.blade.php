@@ -24,12 +24,12 @@
                             </div>
 
                             <div class="relative">
-                                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                                    <div id="selectedEmojis" class="flex flex-wrap gap-2 min-h-[3rem]">
+                                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg relative min-h-[4rem]">
+                                    <div id="selectedEmojis" class="flex flex-wrap gap-2 relative z-10">
                                         <!-- Selected emojis will appear here -->
                                     </div>
-                                    <div id="emptyState" class="absolute inset-0 flex items-center justify-center text-gray-400 pointer-events-none">
-                                        <p class="text-sm">Click "Choose Emoji" to start building your scene</p>
+                                    <div id="emptyState" class="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-50 transition-opacity duration-200">
+                                        <p class="text-sm select-none">Click "Choose Emoji" to start building your scene</p>
                                     </div>
                                 </div>
                                 <div id="emojiSuggestions" class="mt-3 flex flex-wrap gap-2">
@@ -120,6 +120,9 @@
         // CSS styles
         document.head.appendChild(Object.assign(document.createElement('style'), {
             textContent: `
+                #emptyState {
+                    transition: opacity 0.2s ease-out;
+                }
                 emoji-picker {
                     width: 100%;
                     height: 350px;
@@ -148,7 +151,8 @@
         }));
 
         function updateEmptyState() {
-            emptyState.style.display = selectedEmojis.size === 0 ? 'flex' : 'none';
+            emptyState.style.opacity = selectedEmojis.size === 0 ? '1' : '0';
+            emptyState.style.pointerEvents = selectedEmojis.size === 0 ? 'auto' : 'none';
         }
 
         function updateEmojiCount() {
@@ -160,6 +164,29 @@
             } else {
                 emojiButton.classList.remove('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
                 emojiButton.classList.add('bg-indigo-50', 'text-indigo-600', 'hover:bg-indigo-100');
+            }
+        }
+
+        async function updatePreview() {
+            if (selectedEmojis.size > 0) {
+                try {
+                    const response = await fetch('/api/v1/emoji/preview', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ emojis: Array.from(selectedEmojis) })
+                    });
+                    const data = await response.json();
+                    
+                    previewTranslation.textContent = `Will generate: ${data.final_translation}`;
+                    previewTranslation.classList.add('suggestion-enter');
+                } catch (error) {
+                    console.error('Preview error:', error);
+                }
+            } else {
+                previewTranslation.textContent = '';
             }
         }
 
@@ -204,29 +231,34 @@
         }
 
         async function showSuggestions(emoji) {
-            const suggestions = await getSuggestions(emoji);
-            if (suggestions.length > 0) {
-                emojiSuggestions.innerHTML = '';
-                suggestions.forEach(suggestion => {
-                    if (!selectedEmojis.has(suggestion)) {
-                        const button = document.createElement('button');
-                        button.className = 'px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full hover:bg-gray-100 text-sm suggestion-enter flex items-center gap-1.5 transition-colors';
-                        button.innerHTML = `
-                            <span>Add</span>
-                            <span class="text-base">${suggestion}</span>
-                        `;
-                        button.onclick = () => addEmoji(suggestion);
-                        emojiSuggestions.appendChild(button);
-                    }
+            try {
+                const response = await fetch('/api/v1/emoji/suggestions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ emoji })
                 });
-            }
-        }
-
-        async function updatePreview() {
-            if (selectedEmojis.size > 0) {
-                const preview = await previewTranslation(Array.from(selectedEmojis));
-                previewTranslation.textContent = `Will generate: ${preview.final_translation}`;
-                previewTranslation.classList.add('suggestion-enter');
+                const data = await response.json();
+                
+                if (data.suggestions && data.suggestions.length > 0) {
+                    emojiSuggestions.innerHTML = '';
+                    data.suggestions.forEach(suggestion => {
+                        if (!selectedEmojis.has(suggestion)) {
+                            const button = document.createElement('button');
+                            button.className = 'px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full hover:bg-gray-100 text-sm suggestion-enter flex items-center gap-1.5 transition-colors';
+                            button.innerHTML = `
+                                <span>Add</span>
+                                <span class="text-base">${suggestion}</span>
+                            `;
+                            button.onclick = () => addEmoji(suggestion);
+                            emojiSuggestions.appendChild(button);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Suggestions error:', error);
             }
         }
 
@@ -253,17 +285,26 @@
             addEmoji(event.detail.unicode);
         });
 
-        // Initialize
-        loadEmojiCategories().then(categories => {
-            const categoryTabs = document.getElementById('emojiCategories');
-            Object.entries(categories).forEach(([name, data]) => {
-                const tab = document.createElement('button');
-                tab.className = 'flex-shrink-0 px-3 py-1.5 bg-gray-50 rounded-full hover:bg-gray-100 flex items-center gap-1.5 text-sm transition-colors';
-                tab.innerHTML = `${data.icon} ${name}`;
-                categoryTabs.appendChild(tab);
-            });
-        });
+        // Initialize categorized emojis
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/v1/emoji/categories');
+                const data = await response.json();
+                
+                const categoryTabs = document.getElementById('emojiCategories');
+                Object.entries(data.categories).forEach(([name, info]) => {
+                    const tab = document.createElement('button');
+                    tab.className = 'flex-shrink-0 px-3 py-1.5 bg-gray-50 rounded-full hover:bg-gray-100 flex items-center gap-1.5 text-sm transition-colors';
+                    tab.innerHTML = `${info.icon} ${name}`;
+                    categoryTabs.appendChild(tab);
+                });
+            } catch (error) {
+                console.error('Categories error:', error);
+            }
+        }
 
+        // Initialize
+        loadCategories();
         updateEmptyState();
         updateEmojiCount();
     </script>
