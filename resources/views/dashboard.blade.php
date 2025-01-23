@@ -277,7 +277,7 @@
             emojiPickerContainer.classList.add('hidden');
         });
 
-        document.querySelector('#emojiPickerContainer .fixed.left-1/2').addEventListener('click', e => {
+        document.querySelector('#emojiPickerContainer .fixed').addEventListener('click', e => {
             e.stopPropagation();
         });
 

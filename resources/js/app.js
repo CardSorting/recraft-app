@@ -1,6 +1,29 @@
 import './bootstrap';
 import 'emoji-picker-element';
 
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const picker = document.querySelector('emoji-picker');
+        if (!picker) {
+            console.error('Emoji picker element not found');
+            return;
+        }
+
+        picker.addEventListener('emoji-click', event => {
+            console.log('Emoji clicked:', event.detail);
+            const emoji = event.detail.unicode;
+            const promptArea = document.getElementById('prompt-area');
+            if (promptArea) {
+                promptArea.value += emoji;
+            } else {
+                console.error('Prompt area element not found');
+            }
+        });
+    } catch (error) {
+        console.error('Error initializing emoji picker:', error);
+    }
+});
+
 // Add emoji picker styles
 const style = document.createElement('style');
 style.textContent = `
