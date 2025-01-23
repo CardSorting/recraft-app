@@ -10,9 +10,15 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <form id="imageGenerationForm" class="space-y-6">
-                        <div>
-                            <x-input-label for="prompt" :value="__('Image Prompt')" />
-                            <x-text-input id="prompt" name="prompt" type="text" class="mt-1 block w-full" required />
+                        <div class="space-y-4">
+                            <x-input-label for="emojis" :value="__('Select Emojis')" />
+                            <div class="mt-2 flex flex-wrap gap-2 min-h-[3rem] p-2 border border-gray-300 rounded-md" id="selectedEmojis">
+                                <!-- Selected emojis will appear here -->
+                            </div>
+                            <button type="button" id="emojiButton" class="mt-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200">
+                                Add Emoji 😊
+                            </button>
+                            <emoji-picker id="emojiPicker" class="hidden" style="position: absolute; z-index: 50;"></emoji-picker>
                         </div>
 
                         <div>
@@ -59,10 +65,121 @@
     </div>
 
     @push('scripts')
-    <script>
+    <script type="module">
+        import 'emoji-picker-element';
+        
+        const selectedEmojis = new Set();
+        const selectedEmojisContainer = document.getElementById('selectedEmojis');
+        const emojiButton = document.getElementById('emojiButton');
+        const emojiPicker = document.getElementById('emojiPicker');
+        
+        // Load emoji categories from API
+        async function loadEmojiCategories() {
+            const response = await fetch('/api/v1/emoji/categories');
+            const data = await response.json();
+            return data.categories;
+        }
+
+        // Get suggestions for the selected emoji
+        async function getSuggestions(emoji) {
+            const response = await fetch('/api/v1/emoji/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ emoji })
+            });
+            const data = await response.json();
+            return data.suggestions;
+        }
+
+        // Preview the translation
+        async function previewTranslation(emojis) {
+            const response = await fetch('/api/v1/emoji/preview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ emojis: Array.from(emojis) })
+            });
+            const data = await response.json();
+            return data;
+        }
+
+        // Initialize categorized emojis
+        loadEmojiCategories().then(categories => {
+            const categoryTabs = document.createElement('div');
+            categoryTabs.className = 'emoji-categories flex gap-2 mb-4';
+            Object.entries(categories).forEach(([name, data]) => {
+                const tab = document.createElement('button');
+                tab.className = 'px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center gap-1';
+                tab.innerHTML = `${data.icon} ${name}`;
+                categoryTabs.appendChild(tab);
+            });
+            emojiPicker.insertAdjacentElement('beforebegin', categoryTabs);
+        });
+
+        // Toggle emoji picker
+        emojiButton.addEventListener('click', () => {
+            emojiPicker.classList.toggle('hidden');
+            // Position the picker below the button
+            const rect = emojiButton.getBoundingClientRect();
+            emojiPicker.style.top = `${rect.bottom + window.scrollY}px`;
+            emojiPicker.style.left = `${rect.left}px`;
+        });
+
+        // Show emoji suggestions
+        async function showSuggestions(emoji) {
+            const suggestions = await getSuggestions(emoji);
+            if (suggestions.length > 0) {
+                const suggestionContainer = document.createElement('div');
+                suggestionContainer.className = 'mt-2 flex gap-2';
+                suggestions.forEach(suggestion => {
+                    const suggestionButton = document.createElement('button');
+                    suggestionButton.className = 'px-2 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 text-sm';
+                    suggestionButton.textContent = `Add ${suggestion}`;
+                    suggestionButton.onclick = () => addEmoji(suggestion);
+                    suggestionContainer.appendChild(suggestionButton);
+                });
+                selectedEmojisContainer.appendChild(suggestionContainer);
+            }
+        }
+
+        // Handle emoji selection
+        emojiPicker.addEventListener('emoji-click', event => {
+            const emoji = event.detail.unicode;
+            if (!selectedEmojis.has(emoji)) {
+                selectedEmojis.add(emoji);
+                const emojiSpan = document.createElement('span');
+                emojiSpan.className = 'inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-lg';
+                emojiSpan.innerHTML = `${emoji}<button type="button" class="text-gray-500 hover:text-gray-700">×</button>`;
+                emojiSpan.querySelector('button').onclick = () => {
+                    selectedEmojis.delete(emoji);
+                    emojiSpan.remove();
+                };
+                selectedEmojisContainer.appendChild(emojiSpan);
+            }
+            emojiPicker.classList.add('hidden');
+        });
+
+        // Close picker when clicking outside
+        document.addEventListener('click', event => {
+            if (!emojiPicker.contains(event.target) && !emojiButton.contains(event.target)) {
+                emojiPicker.classList.add('hidden');
+            }
+        });
+
+        // Handle form submission
         document.getElementById('imageGenerationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            if (selectedEmojis.size === 0) {
+                alert('Please select at least one emoji');
+                return;
+            }
+
             const form = e.target;
             const status = document.getElementById('status');
             const result = document.getElementById('result');
@@ -71,7 +188,6 @@
             result.innerHTML = '';
 
             try {
-                // Generate the image
                 const response = await fetch('/api/v1/images/generate', {
                     method: 'POST',
                     headers: {
@@ -79,7 +195,7 @@
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({
-                        prompt: form.prompt.value,
+                        emojis: Array.from(selectedEmojis),
                         image_size: form.image_size.value,
                         style: form.style.value
                     })
